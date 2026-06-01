@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}{% if mode == 'edit' %}Edit Network{% else %}Add Network{% endif %} — iptracker{% endblock %}
+{% block nav_networks %}active{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="d-flex align-items-center mb-3 gap-2">
+      <a href="{{ url_for('networks.list_networks') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h5 class="mb-0">
+        {% if mode == 'edit' %}Edit Network: {{ network.name }}{% else %}Add Network{% endif %}
+      </h5>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control"
+                   value="{{ form.get('name') or (network.name if network else '') }}"
+                   placeholder="e.g. LAN, DMZ, Guest" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">CIDR <span class="text-danger">*</span></label>
+            <input type="text" name="cidr" class="form-control font-monospace"
+                   value="{{ form.get('cidr') or (network.cidr if network else '') }}"
+                   placeholder="192.168.1.0/24" required>
+            <div class="form-text">Use CIDR notation. Host bits are ignored (e.g. 192.168.1.5/24 → 192.168.1.0/24).</div>
+            <div id="cidrWarning" class="alert alert-warning py-2 mt-1 small d-none">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              Networks larger than /20 have over 4,094 hosts — scans will be very slow and create large amounts of data. Consider using a smaller subnet.
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">VLAN ID</label>
+            <input type="number" name="vlan" class="form-control" min="1" max="4094"
+                   value="{{ form.get('vlan') or (network.vlan if network and network.vlan else '') }}"
+                   placeholder="e.g. 10">
+            <div class="form-text">Optional. 802.1Q VLAN tag (1–4094).</div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="3">{{ form.get('notes') or (network.notes if network else '') }}</textarea>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              {% if mode == 'edit' %}Save Changes{% else %}Add Network{% endif %}
+            </button>
+            <a href="{{ url_for('networks.list_networks') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var cidrInput = document.querySelector('[name="cidr"]');
+  var warning = document.getElementById('cidrWarning');
+  function check() {
+    var m = cidrInput.value.match(/\/(\d+)$/);
+    warning.classList.toggle('d-none', !(m && parseInt(m[1], 10) < 20));
+  }
+  cidrInput.addEventListener('input', check);
+  check();
+})();
+</script>
+{% endblock %}

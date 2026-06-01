@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}{{ network.name }} — iptracker{% endblock %}
+{% block nav_networks %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="{{ url_for('networks.list_networks') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h5 class="mb-0">{{ network.name }}</h5>
+  <span class="badge bg-secondary font-monospace">{{ network.cidr }}</span>
+  {% if network.vlan %}
+  <span class="badge bg-info-subtle text-info-emphasis font-monospace">VLAN {{ network.vlan }}</span>
+  {% endif %}
+  <div class="ms-auto d-flex gap-2">
+    <a href="{{ url_for('ping.dashboard', network_id=network.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-broadcast"></i> Ping
+    </a>
+    <a href="{{ url_for('discovery.dashboard', network_id=network.id) }}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-radar"></i> Discovery
+    </a>
+    <a href="{{ url_for('networks.network_edit', network_id=network.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-pencil"></i> Edit
+    </a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-3 fw-bold text-success">{{ up_count }}</div>
+        <div class="text-muted small">Up</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-3 fw-bold">{{ hosts|length }}</div>
+        <div class="text-muted small">Hosts Seen</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-3 fw-bold text-info">{{ open_ports }}</div>
+        <div class="text-muted small">Open Ports (total)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body py-3">
+        <div class="text-muted small mb-1">Last Ping Scan</div>
+        <div class="small">{% if last_ping_run %}{{ last_ping_run.finished_at | fmt_dt }}{% else %}—{% endif %}</div>
+        <div class="text-muted small mt-2 mb-1">Last Discovery</div>
+        <div class="small">{% if last_disc_run %}{{ last_disc_run.finished_at | fmt_dt }}{% else %}—{% endif %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if network.notes %}
+<div class="card mb-4">
+  <div class="card-body py-2 text-muted small">{{ network.notes }}</div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <span><i class="bi bi-broadcast me-1"></i>Hosts ({{ hosts|length }})</span>
+    <a href="{{ url_for('devices.device_new') }}" class="btn btn-xs btn-outline-primary">
+      <i class="bi bi-plus"></i> Add Device
+    </a>
+  </div>
+  {% if hosts %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0" id="netDetailTable">
+      <thead>
+        <tr>
+          <th>IP</th>
+          <th>Hostname</th>
+          <th>Status</th>
+          <th>Last Seen</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for host in hosts %}
+        {% set pr = latest_ping.get(host.id) %}
+        <tr>
+          <td class="font-monospace" data-sort-val="{{ host.ip }}">{{ host.ip }}</td>
+          <td class="text-muted small">
+            {{ host.hostname or '—' }}
+            {% if host.device %}
+            <span class="badge bg-secondary ms-1">{{ host.device.type }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if host.is_reserved %}
+              <span class="badge bg-reserved">Reserved</span>
+            {% elif pr %}
+              <span class="badge {% if pr.is_up %}bg-success{% else %}bg-danger{% endif %}">
+                {% if pr.is_up %}Up{% else %}Down{% endif %}
+              </span>
+            {% else %}
+              <span class="badge bg-secondary">Unknown</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small" data-sort-val="{{ pr.scanned_at.timestamp()|int if pr else 0 }}">
+            {% if pr %}{{ pr.scanned_at | ago }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            {% if host.device %}
+            <a href="{{ url_for('devices.device_detail', device_id=host.device.id) }}"
+               class="btn btn-xs btn-outline-secondary" title="Device detail">
+              <i class="bi bi-hdd-rack"></i>
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-center text-muted py-4">
+    No hosts yet. Run a ping scan to discover hosts.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+makeTableSortable('netDetailTable', [
+  {index: 0, type: 'ip'},
+  {index: 1, type: 'text'},
+  {index: 2, type: 'text'},
+  {index: 3, type: 'num'}
+], 0, 'asc');
+</script>
+{% endblock %}

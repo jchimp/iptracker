@@ -1,0 +1,173 @@
+/* iptracker stylesheet */
+
+:root {
+  --ip-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --ip-nav-hover: rgba(var(--bs-emphasis-color-rgb), .08);
+  --ip-radius: .375rem;
+  --ip-reserved: #c850c0;
+}
+
+.container-fluid { width: 96%; max-width: 96%; }
+
+body { font-family: var(--ip-font); font-size: .875rem; }
+
+th { padding: .25rem .25rem .25rem .55rem !important; font-weight: 600; }
+td { padding: .25rem .25rem .25rem .55rem !important; }
+
+/* ── navbar ───────────────────────────────────────────────────── */
+.ip-navbar {
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: .45rem 1rem;
+}
+.ip-navbar .navbar-brand {
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: -.02em;
+}
+.ip-nav .nav-link {
+  font-size: .85rem;
+  padding: .35rem .75rem;
+  border-radius: var(--ip-radius);
+  color: var(--bs-body-color);
+  transition: background .15s;
+}
+.ip-nav .nav-link:hover { background: var(--ip-nav-hover); }
+.ip-nav .nav-link.active { background: var(--bs-primary); color: #fff; }
+.ip-nav .nav-link i { margin-right: .3rem; }
+
+.ip-theme-btn {
+  border: 1px solid var(--bs-border-color);
+  background: transparent;
+  color: var(--bs-body-color);
+  border-radius: var(--ip-radius);
+  padding: .3rem .55rem;
+  font-size: .85rem;
+  cursor: pointer;
+  transition: background .15s;
+}
+.ip-theme-btn:hover { background: var(--ip-nav-hover); }
+
+/* ── tables ───────────────────────────────────────────────────── */
+.table { font-size: .85rem; }
+.ip-flash { font-size: .85rem; padding: .5rem .75rem; }
+
+/* ── badges ───────────────────────────────────────────────────── */
+.bg-reserved { background-color: var(--ip-reserved) !important; }
+.text-reserved { color: var(--ip-reserved) !important; }
+
+/* ── small button variant ─────────────────────────────────────── */
+.btn-xs {
+  font-size: .75rem;
+  padding: .1rem .35rem;
+  border-radius: .25rem;
+  line-height: 1.4;
+}
+
+/* ── fav star ─────────────────────────────────────────────────── */
+.fav-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: .85rem;
+  padding: 0;
+  color: var(--bs-secondary-color);
+  opacity: 0;
+  transition: opacity .15s;
+}
+tr:hover .fav-btn { opacity: .5; }
+.fav-btn:hover, .fav-btn[data-fav="true"] { opacity: 1; }
+
+/* ── scan overlay ─────────────────────────────────────────────── */
+.scan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, .78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scan-overlay-inner {
+  text-align: center;
+  color: #fff;
+}
+.scan-pulse {
+  display: block;
+  color: #0d6efd;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: .3; transform: scale(.9); }
+  50%       { opacity: 1;  transform: scale(1.15); }
+}
+.scan-dots::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+@keyframes dots {
+  0%  { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
+/* ── sparkline ────────────────────────────────────────────────── */
+.sparkline { display: block; }
+
+/* ── note inline editing ──────────────────────────────────────── */
+.note-display {
+  cursor: text;
+  display: block;
+  min-height: 1.2em;
+}
+.note-display:empty::after {
+  content: '…';
+  opacity: .3;
+  font-style: italic;
+}
+.note-display:hover { opacity: .75; }
+
+/* ── table link style ────────────────────────────────────────── */
+.table td a:not(.btn) {
+  text-decoration: none;
+  color: var(--bs-body-color);
+}
+.table td a:not(.btn):hover {
+  text-decoration: underline;
+  color: var(--bs-primary);
+}
+
+/* ── sortable columns ────────────────────────────────────────── */
+.sortable-col { cursor: pointer; user-select: none; }
+.sortable-col:hover { filter: brightness(0.93); }
+.sort-ind { font-size: .7em; opacity: .35; }
+.sort-ind.active { opacity: 1; }
+
+/* ── table header background ──────────────────────────────────── */
+.table thead {
+  --bs-table-bg: var(--bs-tertiary-bg);
+  border-bottom: 2px solid var(--bs-border-color);
+}
+
+/* ── resizable column handle ──────────────────────────────────── */
+th.resizable { position: relative; overflow: visible; }
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  user-select: none;
+}
+.col-resize-handle:hover,
+.col-resize-handle.dragging { background: rgba(var(--bs-primary-rgb), 0.35); }
+body.col-resizing,
+body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
+
+/* ── port change rows ─────────────────────────────────────────── */
+.table-success td { --bs-table-bg: rgba(25, 135, 84, .12); }
+.table-danger td  { --bs-table-bg: rgba(220, 53, 69, .12); }
+[data-bs-theme="dark"] .table-success td { --bs-table-bg: rgba(25, 135, 84, .2); }
+[data-bs-theme="dark"] .table-danger td  { --bs-table-bg: rgba(220, 53, 69, .2); }

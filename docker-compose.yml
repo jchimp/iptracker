@@ -1,0 +1,15 @@
+services:
+  iptracker:
+    build: .
+    container_name: iptracker
+    restart: unless-stopped
+    ports:
+      - "${IPTRACKER_PORT:-8080}:8000"
+    cap_add:
+      - NET_RAW           # required for ICMP ping inside the container
+    volumes:
+      - ./data:/app/data  # persists the SQLite database and any exports
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me-to-a-random-string}
+      - DATABASE_URL=sqlite:////app/data/iptracker.db
+      - TZ=${TZ:-America/Denver}

@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}Tools — iptracker{% endblock %}
+{% block nav_tools %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Tools</h5>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="toolsTabs" role="tablist">
+  <li class="nav-item">
+    <button class="nav-link active" id="oui-tab" data-bs-toggle="tab"
+            data-bs-target="#ouiPane" type="button">
+      <i class="bi bi-upc-scan me-1"></i>OUI Lookup
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" id="cidr-tab" data-bs-toggle="tab"
+            data-bs-target="#cidrPane" type="button">
+      <i class="bi bi-diagram-2 me-1"></i>CIDR Calculator
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  {# ── OUI Lookup ───────────────────────────────────────────────── #}
+  <div class="tab-pane fade show active" id="ouiPane" role="tabpanel">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Look up the hardware vendor for any MAC address using the IEEE OUI database.
+            </p>
+            <div class="input-group">
+              <input type="text" id="ouiInput" class="form-control font-monospace"
+                     placeholder="00:1A:2B:3C:4D:5E" autocomplete="off">
+              <button class="btn btn-primary" id="ouiBtn">
+                <i class="bi bi-search"></i> Lookup
+              </button>
+            </div>
+            <div class="form-text">Accepts any separator: colons, hyphens, or none.</div>
+
+            <div id="ouiResult" class="mt-3 d-none">
+              <div class="card bg-body-secondary">
+                <div class="card-body py-3">
+                  <div class="row g-2 small">
+                    <div class="col-5 fw-medium text-muted">MAC</div>
+                    <div class="col-7 font-monospace" id="ouiMacOut"></div>
+                    <div class="col-5 fw-medium text-muted">Vendor</div>
+                    <div class="col-7" id="ouiVendorOut"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="ouiError" class="mt-3 d-none text-danger small"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── CIDR Calculator ──────────────────────────────────────────── #}
+  <div class="tab-pane fade" id="cidrPane" role="tabpanel">
+    <div class="row g-4">
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-body">
+            <p class="text-muted small mb-3">
+              Enter an IP range in CIDR notation or as an IP + netmask.
+            </p>
+            <div class="input-group">
+              <input type="text" id="cidrInput" class="form-control font-monospace"
+                     placeholder="192.168.1.0/24" autocomplete="off">
+              <button class="btn btn-primary" id="cidrBtn">
+                <i class="bi bi-calculator"></i> Calculate
+              </button>
+            </div>
+            <div class="form-text">Examples: 10.0.0.0/8 &nbsp;·&nbsp; 192.168.1.0 255.255.255.0 &nbsp;·&nbsp; 172.16.5.100/22</div>
+            <div id="cidrError" class="mt-2 d-none text-danger small"></div>
+          </div>
+        </div>
+
+        <div id="cidrSummary" class="card mt-3 d-none">
+          <div class="card-body py-3">
+            <table class="table table-sm mb-0">
+              <tbody id="cidrSummaryBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-7">
+        <div id="cidrHostsCard" class="card d-none">
+          <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <span id="cidrHostsHeader"></span>
+            <button class="btn btn-xs btn-outline-secondary" id="cidrCopyBtn">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+          </div>
+          <div class="card-body py-2" style="max-height:420px;overflow-y:auto">
+            <pre id="cidrHostList" class="mb-0 small font-monospace"
+                 style="white-space:pre-wrap;word-break:break-all"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var OUI_URL  = '{{ url_for("tools.oui_lookup") }}';
+  var CIDR_URL = '{{ url_for("tools.cidr_calc") }}';
+
+  // ── OUI lookup ───────────────────────────────────────────────────
+  function doOui() {
+    var mac = document.getElementById('ouiInput').value.trim();
+    document.getElementById('ouiResult').classList.add('d-none');
+    document.getElementById('ouiError').classList.add('d-none');
+    if (!mac) return;
+
+    fetch(OUI_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({mac: mac})
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          var e = document.getElementById('ouiError');
+          e.textContent = d.error;
+          e.classList.remove('d-none');
+          return;
+        }
+        document.getElementById('ouiMacOut').textContent = d.mac;
+        document.getElementById('ouiVendorOut').textContent = d.vendor || '(unknown)';
+        document.getElementById('ouiResult').classList.remove('d-none');
+      })
+      .catch(function () {
+        document.getElementById('ouiError').textContent = 'Request failed.';
+        document.getElementById('ouiError').classList.remove('d-none');
+      });
+  }
+
+  document.getElementById('ouiBtn').addEventListener('click', doOui);
+  document.getElementById('ouiInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doOui();
+  });
+
+  // ── CIDR calculator ──────────────────────────────────────────────
+  function doCidr() {
+    var cidr = document.getElementById('cidrInput').value.trim();
+    document.getElementById('cidrSummary').classList.add('d-none');
+    document.getElementById('cidrHostsCard').classList.add('d-none');
+    document.getElementById('cidrError').classList.add('d-none');
+    if (!cidr) return;
+
+    fetch(CIDR_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({cidr: cidr})
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          var e = document.getElementById('cidrError');
+          e.textContent = d.error;
+          e.classList.remove('d-none');
+          return;
+        }
+        showCidrResult(d);
+      })
+      .catch(function () {
+        document.getElementById('cidrError').textContent = 'Request failed.';
+        document.getElementById('cidrError').classList.remove('d-none');
+      });
+  }
+
+  function row(label, value) {
+    return '<tr><td class="text-muted" style="width:50%">' + label + '</td>' +
+           '<td class="font-monospace">' + value + '</td></tr>';
+  }
+
+  function showCidrResult(d) {
+    var html = [
+      row('CIDR',           d.cidr),
+      row('Network',        d.network),
+      row('Broadcast',      d.broadcast),
+      row('Netmask',        d.netmask),
+      row('Wildcard mask',  d.wildcard),
+      row('Prefix length',  '/' + d.prefix_len),
+      row('First host',     d.first_host),
+      row('Last host',      d.last_host),
+      row('Usable hosts',   d.total_usable.toLocaleString()),
+      row('Total addresses',d.num_addresses.toLocaleString()),
+    ].join('');
+    document.getElementById('cidrSummaryBody').innerHTML = html;
+    document.getElementById('cidrSummary').classList.remove('d-none');
+
+    if (d.host_list && d.host_list.length > 0) {
+      var hdr = d.truncated
+        ? 'First ' + d.host_list.length + ' of ' + d.total_usable.toLocaleString() + ' usable hosts'
+        : d.total_usable.toLocaleString() + ' usable hosts';
+      document.getElementById('cidrHostsHeader').textContent = hdr;
+      document.getElementById('cidrHostList').textContent = d.host_list.join('\n');
+      document.getElementById('cidrHostsCard').classList.remove('d-none');
+    }
+  }
+
+  document.getElementById('cidrBtn').addEventListener('click', doCidr);
+  document.getElementById('cidrInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doCidr();
+  });
+
+  document.getElementById('cidrCopyBtn').addEventListener('click', function () {
+    var text = document.getElementById('cidrHostList').textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      var btn = document.getElementById('cidrCopyBtn');
+      btn.innerHTML = '<i class="bi bi-check"></i> Copied';
+      setTimeout(function () {
+        btn.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+      }, 1500);
+    });
+  });
+
+  // Restore last active tab from localStorage
+  var lastTab = localStorage.getItem('ip-tools-tab');
+  if (lastTab) {
+    var el = document.getElementById(lastTab);
+    if (el) new bootstrap.Tab(el).show();
+  }
+  document.querySelectorAll('#toolsTabs button').forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function () {
+      localStorage.setItem('ip-tools-tab', btn.id);
+    });
+  });
+})();
+</script>
+{% endblock %}

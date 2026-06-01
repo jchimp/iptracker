@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+{% block title %}Discovery — {{ network.name }} — iptracker{% endblock %}
+{% block nav_discovery %}active{% endblock %}
+
+{% block content %}
+
+{# ── scan overlay ────────────────────────────────────────────── #}
+<div id="scanOverlay" class="scan-overlay d-none">
+  <div class="scan-overlay-inner">
+    <i class="bi bi-radar scan-pulse fs-1"></i>
+    <div class="mt-2 fw-medium">Scanning {{ network.cidr }}<span class="scan-dots"></span></div>
+    <div id="scanStatus" class="text-muted small mt-1"></div>
+  </div>
+</div>
+
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+  <h5 class="mb-0"><i class="bi bi-radar me-2"></i>Discovery</h5>
+
+  {# network selector #}
+  <div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+      {{ network.name }} <span class="badge bg-secondary ms-1 font-monospace">{{ network.cidr }}</span>
+    </button>
+    <ul class="dropdown-menu">
+      {% for n in networks %}
+      <li><a class="dropdown-item {% if n.id == network.id %}active{% endif %}"
+             href="{{ url_for('discovery.dashboard', network_id=n.id) }}">
+        {{ n.name }} — {{ n.cidr }}</a></li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {# profile + scan button #}
+  <div class="input-group input-group-sm" style="width:auto">
+    <select id="profileSelect" class="form-select form-select-sm">
+      {% for key, cfg in profiles.items() %}
+      <option value="{{ key }}">{{ cfg.label }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-primary" id="scanBtn"
+            {% if not nmap_path %}disabled title="nmap not found"{% endif %}>
+      <i class="bi bi-play-fill"></i> Scan
+    </button>
+  </div>
+
+  {% if not nmap_path %}
+  <span class="text-danger small"><i class="bi bi-exclamation-triangle"></i> nmap not found</span>
+  {% endif %}
+
+  <a href="{{ url_for('discovery.export_csv', network_id=network.id) }}"
+     class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-download"></i> CSV
+  </a>
+</div>
+
+{# ── scan info + search ──────────────────────────────────────── #}
+<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+  {% if latest_run %}
+  <span class="text-muted small">Last scan: {{ latest_run.finished_at | fmt_dt }}</span>
+  <span class="badge bg-success">{{ latest_run.up_count }} hosts with open ports</span>
+  {% if prev_run %}
+  <span class="text-muted small">vs. previous: {{ prev_run.finished_at | fmt_dt }}</span>
+  {% endif %}
+  {% if latest_run.status == 'error' %}
+  <span class="badge bg-danger">Error: {{ latest_run.error_msg[:100] }}</span>
+  {% endif %}
+  {% endif %}
+  {% if host_rows %}
+  <button class="btn btn-xs btn-outline-secondary ms-auto" id="expandAllBtn">
+    <i class="bi bi-arrows-expand"></i> Expand All
+  </button>
+  <button class="btn btn-xs btn-outline-secondary" id="collapseAllBtn">
+    <i class="bi bi-arrows-collapse"></i> Collapse All
+  </button>
+  <div class="form-check form-switch mb-0 d-flex align-items-center gap-1">
+  {% else %}
+  <div class="form-check form-switch mb-0 d-flex align-items-center gap-1 ms-auto">
+  {% endif %}
+    <input class="form-check-input" type="checkbox" role="switch" id="discHwToggle">
+    <label class="form-check-label small text-nowrap" for="discHwToggle">HW Info</label>
+  </div>
+  <input type="text" id="discSearch" class="form-control form-control-sm" style="max-width:280px" placeholder="Search hosts, services…">
+</div>
+
+{# ── host table ──────────────────────────────────────────────── #}
+{% if host_rows %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0" id="discTable">
+      <thead>
+        <tr>
+          <th style="width:130px">IP</th>
+          <th style="width:140px">Hostname</th>
+          <th>OS</th>
+          <th style="width:90px" class="text-center">Open Ports</th>
+          <th>Services</th>
+          <th style="width:30px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in host_rows %}
+        {% set dev = row.host %}
+        {% set ports = row.ports %}
+        {% set new_ports = row.new_ports %}
+        {% set closed_ports = row.closed_ports %}
+        {# Main row #}
+        <tr class="host-row" data-target="ports-{{ dev.id }}" style="cursor:pointer">
+          <td class="font-monospace" data-sort-val="{{ dev.ip }}">
+            {{ dev.ip }}
+            {% if dev.device %}
+            <a href="{{ url_for('devices.device_detail', device_id=dev.device.id) }}"
+               class="ms-1 text-muted" title="View device" onclick="event.stopPropagation()">
+              <i class="bi bi-hdd-rack"></i>
+            </a>
+            {% endif %}
+            {% if dev.mac_address %}
+            <div class="disc-mac-info font-monospace text-muted" style="font-size:.72rem;line-height:1.3">{{ dev.mac_address }}</div>
+            {% endif %}
+          </td>
+          <td class="text-muted small" data-sort-val="{{ dev.hostname or '' }}">
+            {{ dev.hostname or '—' }}
+            {% if dev.mac_vendor %}
+            <div class="disc-mac-info text-secondary" style="font-size:.72rem;line-height:1.3">{{ dev.mac_vendor[:24] }}</div>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ dev.os_name or '—' }}</td>
+          <td class="text-center">
+            <span class="badge bg-primary">{{ ports|length }}</span>
+            {% if new_ports %}
+            <span class="badge bg-success" title="New since last scan">+{{ new_ports|length }}</span>
+            {% endif %}
+            {% if closed_ports %}
+            <span class="badge bg-danger" title="Closed since last scan">-{{ closed_ports|length }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">
+            {% set svc_seen = namespace(items=[]) %}
+            {% for p in ports %}
+              {% if p.service and p.service not in svc_seen.items %}
+                {% set svc_seen.items = svc_seen.items + [p.service] %}
+              {% endif %}
+            {% endfor %}
+            {{ svc_seen.items | join(', ') or '—' }}
+          </td>
+          <td class="text-center text-muted">
+            <i class="bi bi-chevron-down toggle-icon"></i>
+          </td>
+        </tr>
+        {# Expanded port detail row #}
+        <tr class="port-detail-row d-none" id="ports-{{ dev.id }}">
+          <td colspan="6" class="ps-4 pb-3">
+            {% if ports %}
+            <table class="table table-sm mb-0 w-auto">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Proto</th>
+                  <th>Service</th>
+                  <th>Product / Version</th>
+                  <th>Change</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in ports %}
+                {% set is_new = (p.port, p.protocol) in new_ports %}
+                <tr {% if is_new %}class="table-success"{% endif %}>
+                  <td class="font-monospace">{{ p.port }}</td>
+                  <td class="text-muted small">{{ p.protocol }}</td>
+                  <td class="small">{{ p.service or '—' }}</td>
+                  <td class="small text-muted">
+                    {{ p.product }}{% if p.product and p.version %} {{ p.version }}{% endif %}
+                  </td>
+                  <td>
+                    {% if is_new %}<span class="badge bg-success">New</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+                {# Closed ports from previous scan #}
+                {% for port_proto in closed_ports %}
+                <tr class="table-danger">
+                  <td class="font-monospace">{{ port_proto[0] }}</td>
+                  <td class="text-muted small">{{ port_proto[1] }}</td>
+                  <td class="small text-muted">—</td>
+                  <td class="small text-muted">—</td>
+                  <td><span class="badge bg-danger">Closed</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <span class="text-muted small">No open ports.</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif latest_run %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-radar fs-1 d-block mb-3"></i>
+    Scan completed but no open ports found.
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-radar fs-1 d-block mb-3"></i>
+    No scan data yet. Select a profile and click <strong>Scan</strong>.
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var SCAN_BASE = '{{ url_for("discovery.start_scan", network_id=network.id) }}';
+  var STATUS_TPL = '{{ url_for("discovery.scan_status", network_id=network.id, run_id=0) }}'.replace('/0/', '/RUN_ID/');
+  var scanRunId = null;
+
+  document.getElementById('scanBtn').addEventListener('click', function () {
+    var profile = document.getElementById('profileSelect').value;
+    var fd = new FormData();
+    fd.append('profile', profile);
+    fetch(SCAN_BASE, {method: 'POST', body: fd})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { alert(d.error || 'Could not start scan'); return; }
+        scanRunId = d.scan_run_id;
+        showOverlay();
+        poll();
+      })
+      .catch(function () { alert('Request failed'); });
+  });
+
+  {% if running_run %}
+  scanRunId = {{ running_run.id }};
+  showOverlay();
+  poll();
+  {% endif %}
+
+  function poll() {
+    var url = STATUS_TPL.replace('RUN_ID', scanRunId);
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.host_count) {
+          document.getElementById('scanStatus').textContent = d.up_count + ' hosts with open ports / ' + d.host_count + ' total';
+        }
+        if (d.status === 'running') {
+          setTimeout(poll, 2000);
+        } else {
+          hideOverlay();
+          window.location.reload();
+        }
+      })
+      .catch(function () { setTimeout(poll, 3000); });
+  }
+
+  function showOverlay() {
+    document.getElementById('scanOverlay').classList.remove('d-none');
+    document.getElementById('scanBtn').disabled = true;
+  }
+
+  function hideOverlay() {
+    document.getElementById('scanOverlay').classList.add('d-none');
+    document.getElementById('scanBtn').disabled = false;
+  }
+
+  // Expand/collapse port rows
+  document.querySelectorAll('.host-row').forEach(function (row) {
+    row.addEventListener('click', function () {
+      var target = document.getElementById(this.dataset.target);
+      if (!target) return;
+      var hidden = target.classList.contains('d-none');
+      target.classList.toggle('d-none', !hidden);
+      var icon = this.querySelector('.toggle-icon');
+      if (icon) icon.className = 'bi bi-chevron-' + (hidden ? 'up' : 'down') + ' toggle-icon';
+    });
+  });
+
+  // HW Info toggle
+  var discHwToggle = document.getElementById('discHwToggle');
+  if (discHwToggle) {
+    discHwToggle.checked = localStorage.getItem('ip-disc-hw-info') !== 'hidden';
+    function applyDiscHw() {
+      document.querySelectorAll('.disc-mac-info').forEach(function(el) {
+        el.classList.toggle('d-none', !discHwToggle.checked);
+      });
+      localStorage.setItem('ip-disc-hw-info', discHwToggle.checked ? 'visible' : 'hidden');
+    }
+    discHwToggle.addEventListener('change', applyDiscHw);
+    applyDiscHw();
+  }
+
+  makeSearchClearable('discSearch');
+  makeResizable('discTable');
+
+  // Sortable columns: IP(0), Hostname(1)
+  makeTableSortable('discTable', [
+    {index: 0, type: 'ip'},
+    {index: 1, type: 'text'}
+  ], 0, 'asc');
+
+  var expandAllBtn = document.getElementById('expandAllBtn');
+  var collapseAllBtn = document.getElementById('collapseAllBtn');
+  if (expandAllBtn) {
+    expandAllBtn.addEventListener('click', function () {
+      document.querySelectorAll('.port-detail-row').forEach(function (r) { r.classList.remove('d-none'); });
+      document.querySelectorAll('.toggle-icon').forEach(function (i) { i.className = 'bi bi-chevron-up toggle-icon'; });
+    });
+  }
+  if (collapseAllBtn) {
+    collapseAllBtn.addEventListener('click', function () {
+      document.querySelectorAll('.port-detail-row').forEach(function (r) { r.classList.add('d-none'); });
+      document.querySelectorAll('.toggle-icon').forEach(function (i) { i.className = 'bi bi-chevron-down toggle-icon'; });
+    });
+  }
+
+  // Search
+  document.getElementById('discSearch').addEventListener('input', function () {
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('#discTable .host-row').forEach(function (row) {
+      var nextRow = row.nextElementSibling;
+      var show = row.textContent.toLowerCase().includes(q);
+      row.style.display = show ? '' : 'none';
+      if (nextRow && nextRow.classList.contains('port-detail-row')) {
+        nextRow.style.display = show ? nextRow.classList.contains('d-none') ? 'none' : '' : 'none';
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

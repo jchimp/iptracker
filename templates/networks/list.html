@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Networks — iptracker{% endblock %}
+{% block nav_networks %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Networks</h5>
+  <a href="{{ url_for('networks.network_new') }}" class="btn btn-sm btn-primary">
+    <i class="bi bi-plus-lg"></i> Add Network
+  </a>
+</div>
+
+{% if networks %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>CIDR</th>
+          <th class="text-center">VLAN</th>
+          <th class="text-center">Up</th>
+          <th class="text-center">Devices</th>
+          <th>Last Ping</th>
+          <th>Last Discovery</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for net in networks %}
+        {% set s = stats[net.id] %}
+        <tr>
+          <td>
+            <a href="{{ url_for('networks.network_detail', network_id=net.id) }}" class="fw-medium">{{ net.name }}</a>
+          </td>
+          <td class="font-monospace">{{ net.cidr }}</td>
+          <td class="text-center text-muted small font-monospace">
+            {% if net.vlan %}{{ net.vlan }}{% else %}—{% endif %}
+          </td>
+          <td class="text-center">
+            <span class="badge bg-success">{{ s.up }}</span>
+          </td>
+          <td class="text-center text-muted">{{ s.total_hosts }}</td>
+          <td class="text-muted small">
+            {% if s.last_ping %}{{ s.last_ping.finished_at | fmt_dt }}{% else %}—{% endif %}
+          </td>
+          <td class="text-muted small">
+            {% if s.last_disc %}{{ s.last_disc.finished_at | fmt_dt }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <a href="{{ url_for('ping.dashboard', network_id=net.id) }}" class="btn btn-xs btn-outline-secondary" title="Ping"><i class="bi bi-broadcast"></i></a>
+            <a href="{{ url_for('discovery.dashboard', network_id=net.id) }}" class="btn btn-xs btn-outline-secondary" title="Scan"><i class="bi bi-radar"></i></a>
+            <a href="{{ url_for('networks.network_edit', network_id=net.id) }}" class="btn btn-xs btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{{ url_for('networks.network_delete', network_id=net.id) }}" class="d-inline"
+                  onsubmit="return confirm('Delete network {{ net.name }}? This also deletes all devices and scan history.')">
+              <button type="submit" class="btn btn-xs btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-diagram-3 fs-1 d-block mb-3"></i>
+    No networks defined yet.
+    <a href="{{ url_for('networks.network_new') }}">Add your first network</a>.
+  </div>
+</div>
+{% endif %}
+{% endblock %}

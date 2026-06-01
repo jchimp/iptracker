@@ -1,0 +1,367 @@
+{% extends 'base.html' %}
+{% block title %}{{ device.display_name }} — iptracker{% endblock %}
+{% block nav_devices %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="{{ url_for('devices.list_devices') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h5 class="mb-0">{{ device.display_name }}</h5>
+  <span class="badge bg-secondary">{{ device.type }}</span>
+  {% if device.is_favorite %}
+  <span><i class="bi bi-star-fill text-warning"></i></span>
+  {% endif %}
+  <div class="ms-auto d-flex align-items-center gap-2">
+    {% if device.host %}
+    <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#pingModal">
+      <i class="bi bi-broadcast"></i> Ping
+    </button>
+    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scanModal">
+      <i class="bi bi-radar"></i> Scan
+    </button>
+    {% endif %}
+    <form method="post" action="{{ url_for('devices.device_delete', device_id=device.id) }}"
+          class="d-inline" onsubmit="return confirm('Delete this device?')">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash"></i> Delete
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4">
+  {# ── edit form ───────────────────────────────────────────────── #}
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header py-2">Device Info</div>
+      <div class="card-body">
+        <form method="post">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">Name</label>
+              <input type="text" name="name" class="form-control" value="{{ device.name }}">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">IP Address</label>
+              <input type="text" name="ip" class="form-control font-monospace" value="{{ device.ip }}">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Hostname</label>
+              <input type="text" name="hostname" class="form-control" value="{{ device.hostname }}">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">URL</label>
+              <input type="text" name="url" class="form-control" value="{{ device.url }}"
+                     placeholder="https://…">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Type</label>
+              <select name="type" class="form-select">
+                {% for t in device_types %}
+                <option value="{{ t }}" {% if device.type == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Network</label>
+              <input type="text" class="form-control" value="{{ device.network.name if device.network else '—' }}" disabled>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" class="form-control" rows="4">{{ device.notes }}</textarea>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# ── status panels ───────────────────────────────────────────── #}
+  <div class="col-md-5">
+    {# ping status #}
+    <div class="card mb-3">
+      <div class="card-header py-2"><i class="bi bi-broadcast me-1"></i>Ping Status</div>
+      <div class="card-body py-3">
+        {% if latest_ping %}
+          <div id="pingStatusRow" class="d-flex align-items-center gap-3 mb-3">
+            {% if latest_ping.is_up %}
+              <span class="badge bg-success fs-6 px-3 py-2">Up</span>
+              {% if latest_ping.response_ms %}
+              <span class="text-muted small">{{ latest_ping.response_ms }}ms</span>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-danger fs-6 px-3 py-2">Down</span>
+            {% endif %}
+          </div>
+          <div class="row g-2 text-muted small">
+            <div class="col-6">
+              <div class="fw-medium">First Seen</div>
+              <div>{% if first_seen %}{{ first_seen.scanned_at | fmt_dt }}{% else %}—{% endif %}</div>
+            </div>
+            <div class="col-6">
+              <div class="fw-medium">Last Seen</div>
+              <div id="pingLastSeenVal">{% if last_seen %}{{ last_seen.scanned_at | fmt_dt }}{% else %}—{% endif %}</div>
+            </div>
+            <div class="col-6">
+              <div class="fw-medium">Last Scanned</div>
+              <div id="pingLastScannedVal">{{ latest_ping.scanned_at | fmt_dt }}</div>
+            </div>
+          </div>
+          {% if device.host and device.host.mac_address %}
+          <div class="mt-2 pt-2 border-top">
+            <div class="row g-2 text-muted small">
+              <div class="col-6">
+                <div class="fw-medium">MAC</div>
+                <div class="font-monospace" style="font-size:.78rem">{{ device.host.mac_address }}</div>
+              </div>
+              {% if device.host.mac_vendor %}
+              <div class="col-6">
+                <div class="fw-medium">Vendor</div>
+                <div>{{ device.host.mac_vendor }}</div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          {% if device.host and device.host.notes %}
+          <div class="mt-2 pt-2 border-top">
+            <div class="fw-medium text-muted small mb-1">Ping Notes</div>
+            <div class="small">{{ device.host.notes }}</div>
+          </div>
+          {% endif %}
+        {% else %}
+          <p class="text-muted mb-0 small">No ping data yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# discovery / ports #}
+    <div class="card">
+      <div class="card-header py-2"><i class="bi bi-radar me-1"></i>Discovery Status</div>
+      <div class="card-body py-2">
+        {% if device.host and device.host.os_name %}
+        <div class="d-flex align-items-center gap-2 mb-2 small text-muted">
+          <i class="bi bi-cpu"></i>
+          <span class="fw-medium">OS:</span>
+          <span>{{ device.host.os_name }}</span>
+        </div>
+        {% endif %}
+        {% if latest_ports %}
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Port</th><th>Proto</th><th>Service</th></tr></thead>
+            <tbody>
+              {% for p in latest_ports %}
+              <tr>
+                <td class="font-monospace">{{ p.port }}</td>
+                <td class="text-muted small">{{ p.protocol }}</td>
+                <td class="small">
+                  {{ p.service }}
+                  {% if p.product %}<span class="text-muted">({{ p.product }}{% if p.version %} {{ p.version }}{% endif %})</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="text-muted mb-0 small">No port data yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if device.host %}
+{# ── ping modal ───────────────────────────────────────────────── #}
+<div class="modal fade" id="pingModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="bi bi-broadcast me-1"></i>Ping Host</h6>
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2 small">Ping <code class="font-monospace">{{ device.ip }}</code> and record the result?</p>
+        <div id="pingSpinner" class="text-center d-none py-2">
+          <div class="spinner-border spinner-border-sm text-success"></div>
+          <span class="ms-2 small">Pinging…</span>
+        </div>
+        <div id="pingResult" class="d-none text-center py-1 small fw-medium"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-sm btn-success" id="pingConfirmBtn">
+          <i class="bi bi-broadcast"></i> Ping Now
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── scan modal ───────────────────────────────────────────────── #}
+<div class="modal fade" id="scanModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="bi bi-radar me-1"></i>Port Scan</h6>
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="scanFormArea">
+          <p class="mb-2 small">Run nmap against <code class="font-monospace">{{ device.ip }}</code>.</p>
+          <select id="scanProfileSelect" class="form-select form-select-sm mb-1">
+            <option value="quick">Quick (common ports)</option>
+            <option value="standard">Standard (top 100 ports + services)</option>
+            <option value="full">Full (top 1000 + services + OS detect*)</option>
+          </select>
+          <div class="text-muted" style="font-size:.72rem">* OS detection requires nmap to run as administrator</div>
+        </div>
+        <div id="scanProgress" class="d-none text-center py-2">
+          <div class="spinner-border spinner-border-sm text-primary"></div>
+          <span class="ms-2 small" id="scanProgressMsg">Scanning…</span>
+        </div>
+        <div id="scanDone" class="d-none text-center py-1 small fw-medium text-success">
+          <i class="bi bi-check-circle me-1"></i>Scan complete — reloading…
+        </div>
+        <div id="scanError" class="d-none text-center py-1 small text-danger"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" id="scanCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary" id="scanConfirmBtn">
+          <i class="bi bi-radar"></i> Start Scan
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if device.host %}
+<script>
+(function () {
+  var PING_URL = '{{ url_for("ping.host_ping_single", network_id=device.network_id, host_id=device.host_id) }}';
+  var SCAN_URL = '{{ url_for("discovery.host_scan_single", network_id=device.network_id, host_id=device.host_id) }}';
+  var SCAN_STATUS_TPL = '{{ url_for("discovery.scan_status", network_id=device.network_id, run_id=0) }}'.replace('/0/', '/RUN_ID/');
+
+  // ── Ping ──────────────────────────────────────────────────────
+  document.getElementById('pingConfirmBtn').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    document.getElementById('pingSpinner').classList.remove('d-none');
+    document.getElementById('pingResult').classList.add('d-none');
+
+    fetch(PING_URL, {method: 'POST'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        document.getElementById('pingSpinner').classList.add('d-none');
+        var el = document.getElementById('pingResult');
+        el.classList.remove('d-none');
+        // Update ping status card inline
+        var statusRow = document.getElementById('pingStatusRow');
+        var lastScanned = document.getElementById('pingLastScannedVal');
+        var lastSeen = document.getElementById('pingLastSeenVal');
+        if (statusRow) {
+          statusRow.innerHTML = d.is_up
+            ? '<span class="badge bg-success fs-6 px-3 py-2">Up</span>' +
+              (d.response_ms ? '<span class="text-muted small">' + d.response_ms + 'ms</span>' : '')
+            : '<span class="badge bg-danger fs-6 px-3 py-2">Down</span>';
+        }
+        if (lastScanned && d.scanned_at_fmt) lastScanned.textContent = d.scanned_at_fmt;
+        if (lastSeen && d.is_up && d.last_seen_fmt) lastSeen.textContent = d.last_seen_fmt;
+
+        if (d.is_up) {
+          el.innerHTML = '<span class="badge bg-success">Up</span>' +
+            (d.response_ms ? ' <span class="text-muted">' + d.response_ms + ' ms</span>' : '');
+        } else {
+          el.innerHTML = '<span class="badge bg-danger">Down</span>';
+        }
+        btn.disabled = false;
+      })
+      .catch(function () {
+        document.getElementById('pingSpinner').classList.add('d-none');
+        document.getElementById('pingResult').innerHTML = '<span class="text-danger">Request failed</span>';
+        document.getElementById('pingResult').classList.remove('d-none');
+        btn.disabled = false;
+      });
+  });
+
+  // Reset ping modal on close
+  document.getElementById('pingModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('pingSpinner').classList.add('d-none');
+    document.getElementById('pingResult').classList.add('d-none');
+    document.getElementById('pingConfirmBtn').disabled = false;
+  });
+
+  // ── Scan ──────────────────────────────────────────────────────
+  document.getElementById('scanConfirmBtn').addEventListener('click', function () {
+    var btn = this;
+    var profile = document.getElementById('scanProfileSelect').value;
+    btn.disabled = true;
+    document.getElementById('scanCancelBtn').disabled = true;
+    document.getElementById('scanFormArea').classList.add('d-none');
+    document.getElementById('scanProgress').classList.remove('d-none');
+
+    fetch(SCAN_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({profile: profile})
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          showScanError(d.error || 'Could not start scan');
+          return;
+        }
+        pollScan(d.scan_run_id);
+      })
+      .catch(function () { showScanError('Request failed'); });
+  });
+
+  function pollScan(runId) {
+    var url = SCAN_STATUS_TPL.replace('RUN_ID', runId);
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.status === 'running') {
+          document.getElementById('scanProgressMsg').textContent =
+            d.up_count + ' port' + (d.up_count !== 1 ? 's' : '') + ' found…';
+          setTimeout(function () { pollScan(runId); }, 2000);
+        } else if (d.status === 'error') {
+          showScanError(d.error_msg || 'Scan error');
+        } else {
+          document.getElementById('scanProgress').classList.add('d-none');
+          document.getElementById('scanDone').classList.remove('d-none');
+          setTimeout(function () { window.location.reload(); }, 1200);
+        }
+      })
+      .catch(function () { setTimeout(function () { pollScan(runId); }, 3000); });
+  }
+
+  function showScanError(msg) {
+    document.getElementById('scanProgress').classList.add('d-none');
+    var el = document.getElementById('scanError');
+    el.textContent = msg;
+    el.classList.remove('d-none');
+    document.getElementById('scanCancelBtn').disabled = false;
+    document.getElementById('scanConfirmBtn').disabled = false;
+  }
+
+  // Reset scan modal on close
+  document.getElementById('scanModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('scanFormArea').classList.remove('d-none');
+    document.getElementById('scanProgress').classList.add('d-none');
+    document.getElementById('scanDone').classList.add('d-none');
+    document.getElementById('scanError').classList.add('d-none');
+    document.getElementById('scanConfirmBtn').disabled = false;
+    document.getElementById('scanCancelBtn').disabled = false;
+    document.getElementById('scanProgressMsg').textContent = 'Scanning…';
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

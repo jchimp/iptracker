@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}Overview — iptracker{% endblock %}
+{% block nav_overview %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Overview</h5>
+</div>
+
+{# ── stat cards ──────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-2 fw-bold text-primary">{{ networks|length }}</div>
+        <div class="text-muted small">Networks</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-2 fw-bold text-success">{{ total_up }}</div>
+        <div class="text-muted small">Hosts Up</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-2 fw-bold">{{ total_devices }}</div>
+        <div class="text-muted small">Total Devices</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-3">
+        <div class="fs-2 fw-bold text-danger">{{ total_devices - total_up }}</div>
+        <div class="text-muted small">Hosts Down</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── networks table ──────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <span><i class="bi bi-diagram-3 me-1"></i>Networks</span>
+    <a href="{{ url_for('networks.network_new') }}" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-plus"></i> Add
+    </a>
+  </div>
+  {% if network_stats %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>CIDR</th>
+          <th class="text-center">VLAN</th>
+          <th class="text-center">Up</th>
+          <th class="text-center">Total</th>
+          <th>Last Ping</th>
+          <th>Last Discovery</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in network_stats %}
+        <tr>
+          <td><a href="{{ url_for('networks.network_detail', network_id=s.network.id) }}">{{ s.network.name }}</a></td>
+          <td class="font-monospace">{{ s.network.cidr }}</td>
+          <td class="text-center text-muted small font-monospace">
+            {% if s.network.vlan %}{{ s.network.vlan }}{% else %}—{% endif %}
+          </td>
+          <td class="text-center">
+            <span class="badge bg-success">{{ s.up }}</span>
+          </td>
+          <td class="text-center text-muted">{{ s.total }}</td>
+          <td class="text-muted small">
+            {% if s.last_ping %}{{ s.last_ping.finished_at | fmt_dt }}{% else %}—{% endif %}
+          </td>
+          <td class="text-muted small">
+            {% if s.last_disc %}{{ s.last_disc.finished_at | fmt_dt }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('ping.dashboard', network_id=s.network.id) }}" class="btn btn-xs btn-outline-secondary">Ping</a>
+            <a href="{{ url_for('discovery.dashboard', network_id=s.network.id) }}" class="btn btn-xs btn-outline-secondary">Scan</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted text-center py-4">
+    No networks yet. <a href="{{ url_for('networks.network_new') }}">Add one</a>.
+  </div>
+  {% endif %}
+</div>
+
+{# ── favorites ───────────────────────────────────────────────── #}
+{% if favorites %}
+<div class="card mb-4">
+  <div class="card-header py-2"><i class="bi bi-star-fill text-warning me-1"></i>Favorites</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>IP</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Last Seen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for dev in favorites %}
+        {% set pr = fav_status.get(dev.id) %}{# keyed by device.id in overview route #}
+        <tr>
+          <td><a href="{{ url_for('devices.device_detail', device_id=dev.id) }}">{{ dev.display_name }}</a></td>
+          <td class="font-monospace">{{ dev.ip }}</td>
+          <td><span class="badge bg-secondary">{{ dev.type }}</span></td>
+          <td>
+            {% if pr %}
+              {% if pr.is_up %}
+                <span class="badge bg-success">Up</span>
+              {% else %}
+                <span class="badge bg-danger">Down</span>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-secondary">Unknown</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">
+            {% if pr %}{{ pr.scanned_at | fmt_dt }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

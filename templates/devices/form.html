@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Add Device — iptracker{% endblock %}
+{% block nav_devices %}active{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <a href="{{ url_for('devices.list_devices') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h5 class="mb-0">Add Device</h5>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <form method="post">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <label class="form-label">IP Address <span class="text-danger">*</span></label>
+              <input type="text" name="ip" class="form-control font-monospace" required autofocus
+                     value="{{ form.get('ip', '') }}" placeholder="10.0.0.1">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Network <span class="text-danger">*</span></label>
+              <select name="network_id" class="form-select" required>
+                <option value="">— Select —</option>
+                {% for net in networks %}
+                <option value="{{ net.id }}" {% if form.get('network_id')|string == net.id|string %}selected{% endif %}>
+                  {{ net.name }} ({{ net.cidr }})
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Name</label>
+              <input type="text" name="name" class="form-control" value="{{ form.get('name', '') }}">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Hostname</label>
+              <input type="text" name="hostname" class="form-control" value="{{ form.get('hostname', '') }}">
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">Type</label>
+              <select name="type" class="form-select">
+                {% for t in device_types %}
+                <option value="{{ t }}" {% if form.get('type', 'Host') == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label">URL</label>
+              <input type="text" name="url" class="form-control" value="{{ form.get('url', '') }}" placeholder="https://…">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" class="form-control" rows="3">{{ form.get('notes', '') }}</textarea>
+            </div>
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Add Device</button>
+            <a href="{{ url_for('devices.list_devices') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
