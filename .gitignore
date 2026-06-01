@@ -3,6 +3,10 @@ docs/private
 *.local.md
 NOTES.md
 
+# Claude - exclude for now
+.claude/
+CLAUDE.md
+
 # Temp files
 *.old*
 *.tmp*
