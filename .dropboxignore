@@ -1,4 +1,0 @@
-#=== Python venv ===
-venv/
-.venv/
-__pycache__/
