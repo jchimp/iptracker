@@ -11,5 +11,6 @@ services:
       - ./data:/app/data  # persists the SQLite database and any exports
     environment:
       - SECRET_KEY=${SECRET_KEY:-change-me-to-a-random-string}
+      - IPTRACKER_ADMIN_PASSWORD=${IPTRACKER_ADMIN_PASSWORD}
       - DATABASE_URL=sqlite:////app/data/iptracker.db
       - TZ=${TZ:-America/Denver}

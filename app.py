@@ -92,12 +92,16 @@ def register_cli(app):
 
     @app.cli.command('create-user')
     @click.argument('username')
-    @click.password_option()
+    @click.option('--password', default=None, help='Password (will prompt if not provided)')
     def create_user_cmd(username, password):
         """Create a new user account."""
         if User.query.filter_by(username=username).first():
             click.echo(f'Error: user "{username}" already exists.', err=True)
             return
+
+        if password is None:
+            password = click.prompt('Password', hide_input=True, confirmation_prompt=True)
+
         user = User(username=username)
         user.set_password(password)
         db.session.add(user)

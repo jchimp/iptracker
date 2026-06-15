@@ -14,9 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
-# Production WSGI server — timeout raised for large subnet scans
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "app:app"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
