@@ -7,6 +7,7 @@
 {# ── scan overlay ────────────────────────────────────────────── #}
 <div id="scanOverlay" class="scan-overlay d-none">
   <div class="scan-overlay-inner">
+    <button class="btn-close" id="closeOverlay" style="position:absolute;top:1rem;right:1rem" aria-label="Close"></button>
     <i class="bi bi-radar scan-pulse fs-1"></i>
     <div class="mt-2 fw-medium">Scanning {{ network.cidr }}<span class="scan-dots"></span></div>
     <div id="scanStatus" class="text-muted small mt-1"></div>
@@ -242,11 +243,18 @@
   poll();
   {% endif %}
 
+  // Close button on overlay
+  document.getElementById('closeOverlay').addEventListener('click', hideOverlay);
+
+  var pollRetries = 0;
+  var maxPollRetries = 30; // ~90 seconds before giving up
+
   function poll() {
     var url = STATUS_TPL.replace('RUN_ID', scanRunId);
     fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        pollRetries = 0; // Reset on success
         if (d.host_count) {
           document.getElementById('scanStatus').textContent = d.up_count + ' hosts with open ports / ' + d.host_count + ' total';
         }
@@ -257,7 +265,14 @@
           window.location.reload();
         }
       })
-      .catch(function () { setTimeout(poll, 3000); });
+      .catch(function () {
+        pollRetries++;
+        if (pollRetries < maxPollRetries) {
+          setTimeout(poll, 3000);
+        } else {
+          document.getElementById('scanStatus').textContent = 'Connection lost. Click the X to close.';
+        }
+      });
   }
 
   function showOverlay() {
