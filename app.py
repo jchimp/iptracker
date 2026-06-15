@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Flask, redirect, url_for
 from extensions import db, login_manager
-from models import User
+from models import User, ScanRun
 
 
 def create_app():
@@ -131,6 +131,20 @@ def register_cli(app):
         user.set_password(password)
         db.session.commit()
         click.echo(f'Password updated for "{username}".')
+
+    @app.cli.command('reset-scans')
+    def reset_scans_cmd():
+        """Clear all running scans (for stuck processes after crash/restart)."""
+        running = ScanRun.query.filter_by(status='running').all()
+        if not running:
+            click.echo('No running scans.')
+            return
+        for scan in running:
+            scan.status = 'error'
+            scan.error_msg = 'Cleared by reset-scans command'
+            scan.finished_at = datetime.utcnow()
+        db.session.commit()
+        click.echo(f'Cleared {len(running)} running scan(s).')
 
 
 app = create_app()
